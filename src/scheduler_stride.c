@@ -34,11 +34,86 @@ void enqueueJobStride(char *job_name, int priority, int burst, int start_time, i
     }
 }
 
-/**
- * runSchedulerRR
- * Implements Round Robin scheduling with start time support.
- * It uses a simple linked-list queue where jobs are reinserted until completion.
- */
+void minStart(Node *min_time, int *current_time) {
+    int min_start = -1;
+    Node *temp = stride_list;
+    while (temp != NULL) {
+        if (min_start == -1 || temp->job->start_time < min_start) {
+            min_start = temp->job->start_time;
+            min_time = temp;
+        }
+        temp = temp->next;
+    }
+    if (*current_time < min_start) *current_time = min_start;
+}
+
+void minTimeJob(Node *min_time, int *current_time) {
+    Node *temp = stride_list;
+    while (temp != NULL) {
+        if ((*current_time >= temp->job->start_time) &&
+            (min_time->job->deadline > temp->job->deadline)) {
+                min_time = temp;
+            }
+        temp = temp->next;
+    }
+    min_time->job->deadline += min_time->job->priority;
+    *current_time += min_time->job->priority;
+}
+
+void startJob(Node *min_time, int *current_time, float *total_response_time) {
+    if ((min_time->job->job_id & 0x100000) == 0) { //job started
+        *total_response_time += (*current_time - min_time->job->start_time);
+        min_time->job->job_id |= 0x100000;  // Mark as started
+    }
+}
+
+void checkFinished(Node *min_time, int *current_time) {
+    if (min_time->job->burst <= min_time->job->deadline) {
+        *current_time -= min_time->job->deadline - min_time->job->burst; //reduce time from too completed job
+        min_time->job->burst = min_time->job->deadline;
+    }
+}
+
+void finishJob(Node *min_time, int *current_time, float *total_turnaround_time, float *total_waiting_time, int *count) {
+    if (min_time->job->burst == min_time->job->deadline) {
+        int turnaround_time = *current_time - min_time->job->start_time;
+        int waiting_time = turnaround_time - min_time->job->burst;  
+        *total_turnaround_time += turnaround_time;
+        *total_waiting_time += waiting_time;
+        *count++;
+        if (min_time == stride_list) { 
+            stride_list = stride_list->next;
+        } else {
+            Node *prev = stride_list;
+            while (prev->next && prev->next != min_time)
+                prev = prev->next;
+        
+            if (prev->next == min_time)
+                prev->next = min_time->next; //remove finished job from list
+        }
+        free(min_time->job->job_name);
+        free(min_time->job);
+        free(min_time);
+    }
+}
+
+void printJobs(int current_time) {
+    Node *temp = stride_list;
+    printf("time:%d\n",current_time);
+    while (temp != NULL) {
+        printf("%s:%d ",temp->job->job_name, temp->job->deadline);
+        temp = temp->next;
+    }
+    printf("\n");
+}
+
+void printMetrics(int current_time, float total_turnaround_time, float total_waiting_time, float total_response_time, int count) {
+    printf("\nStride Scheduling Metrics:\n");
+    printf("Average waiting time = %.2f\n", total_waiting_time / count);
+    printf("Average turnaround time = %.2f\n", total_turnaround_time / count);
+    printf("Average response time = %.2f\n", total_response_time / count);
+}
+
  void runSchedulerStride() {
     int current_time = 0;
     float total_waiting_time = 0;
@@ -46,65 +121,15 @@ void enqueueJobStride(char *job_name, int priority, int burst, int start_time, i
     float total_response_time = 0;
     int count = 0;
 
-    while (stride_list != NULL) {
-        // Check for the next ready job
-        int min_start = -1;
+    while (stride_list != NULL) { //untill all jobs are finished
         Node *min_time = stride_list;
-        Node *temp = stride_list;
-        while (temp != NULL) {
-            if (min_start == -1 || temp->job->start_time < min_start) {
-                min_start = temp->job->start_time;
-                min_time = temp;
-            }
-            temp = temp->next;
-        }
-        if (current_time < min_start) current_time = min_start;
-
-        temp = stride_list;
-        while (temp != NULL) {
-            if ((current_time >= temp->job->start_time) &&
-                (min_time->job->deadline > temp->job->deadline)) {
-                    min_time = temp;
-                }
-            temp = temp->next;
-        }
-        min_time->job->deadline += min_time->job->priority;
-        current_time += min_time->job->priority;
-
-        // Record first execution time as response time
-        if ((min_time->job->job_id & 0x100000) == 0) { //job started
-            total_response_time += (current_time - min_time->job->start_time);
-            min_time->job->job_id |= 0x100000;  // Mark as started
-        }
-
-        // If job finished
-        if (min_time->job->burst <= min_time->job->deadline) {
-            current_time -= min_time->job->deadline - min_time->job->burst; //reduce time from too completed job
-            int turnaround_time = current_time - min_time->job->start_time;
-            int waiting_time = turnaround_time - min_time->job->burst;  
-            total_turnaround_time += turnaround_time;
-            total_waiting_time += waiting_time;
-            count++;
-            if (min_time == stride_list) { 
-                stride_list = stride_list->next;
-            } else {
-                Node *prev = stride_list;
-                while (prev->next && prev->next != min_time)
-                    prev = prev->next;
-            
-                if (prev->next == min_time)
-                    prev->next = min_time->next; //remove finished job from list
-            }
-            free(min_time->job->job_name);
-            free(min_time->job);
-            free(min_time);
-        }
+        minStart(min_time, &current_time);
+        minTimeJob(min_time, &current_time);
+        startJob(min_time, &current_time, &total_response_time);
+        checkFinished(min_time, &current_time);
+        printJobs(current_time);
+        finishJob(min_time, &current_time, &total_turnaround_time, &total_waiting_time, &count);
     }
-
-    // Print correct Round Robin scheduling metrics
-    printf("\nStride Scheduling Metrics:\n");
-    printf("Average waiting time = %.2f\n", total_waiting_time / count);
-    printf("Average turnaround time = %.2f\n", total_turnaround_time / count);
-    printf("Average response time = %.2f\n", total_response_time / count);
+    printMetrics(current_time, total_turnaround_time, total_waiting_time, total_response_time, count);
 }
 
