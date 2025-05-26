@@ -17,6 +17,7 @@
  *   "rr"          => Round Robin scheduler
  *   "priority"    => Priority scheduler
  *   "priority_rr" => Priority Round Robin scheduler
+ *   "stride"      => Stride Scheduling
  */
 
 int main(int argc, char *argv[]) {
@@ -78,6 +79,8 @@ int main(int argc, char *argv[]) {
             enqueueJobPriority(job_name, priority, burst, start_time, deadline);
         } else if (strcmp(scheduler_type, "priority_rr") == 0) {
             enqueueJobPriorityRR(job_name, priority, burst, start_time, deadline);
+        } else if (strcmp(scheduler_type, "stride") == 0) {
+            enqueueJobStride(job_name, priority, burst, start_time, deadline);
         } else {
             printf("Error: Unknown scheduler type: %s\n", scheduler_type);
             printf("Valid scheduler types: sjf, edf, fcfs, rr, priority, priority_rr\n");
@@ -101,6 +104,8 @@ int main(int argc, char *argv[]) {
         runSchedulerPriority();
     } else if (strcmp(scheduler_type, "priority_rr") == 0) {
         runSchedulerPriorityRR();
+    } else if (strcmp(scheduler_type, "stride") == 0) {
+        runSchedulerStride();
     }
 
     return 0;

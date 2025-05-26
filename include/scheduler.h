@@ -25,4 +25,8 @@ void runSchedulerPriority();
 void enqueueJobPriorityRR(char *job_name, int priority, int burst, int start_time, int deadline);
 void runSchedulerPriorityRR();
 
+// Stride scheduler
+void enqueueJobStride(char *job_name, int priority, int burst, int start_time, int deadline);
+void runSchedulerStride();
+
 #endif

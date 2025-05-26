@@ -1,0 +1,7 @@
+./scheduler jobs.txt sjf
+./scheduler jobs.txt edf
+./scheduler jobs.txt fcfs
+./scheduler jobs.txt rr
+./scheduler jobs.txt priority
+./scheduler jobs.txt priority_rr
+./scheduler jobs.txt stride
